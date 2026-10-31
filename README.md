@@ -1,5 +1,9 @@
 # AutoCast
 
+<p align="center">
+  <img src="assets/AutoCast-logo.jpeg" alt="AutoCast Logo" width="360" />
+</p>
+
 AutoCast is an automated desktop application designed for streamlined content generation, audiovisual synthesis, and automated publication scheduling to YouTube Studio.
 
 ## Architecture
@@ -17,6 +21,7 @@ The project is structured into modular components:
 
 ```
 AutoCast/
+|-- assets/               Project assets and branding images
 |-- browser_profile/      Local persistent browser storage for session tokens
 |-- data/                 OAuth client tokens and authorization cache
 |-- output/               Exported MP4 video presentations
