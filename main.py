@@ -246,32 +246,53 @@ class AutoCastApp(ctk.CTk):
         settings_box = ctk.CTkFrame(self.tab_settings)
         settings_box.pack(fill="x", padx=5, pady=5)
 
-        lbl_gemini = ctk.CTkLabel(settings_box, text="Gemini API Key:", font=ctk.CTkFont(weight="bold"))
-        lbl_gemini.grid(row=0, column=0, padx=15, pady=15, sticky="w")
+        # AI Engine Mode Selector
+        lbl_mode = ctk.CTkLabel(settings_box, text="Gemini Engine Source:", font=ctk.CTkFont(weight="bold"))
+        lbl_mode.grid(row=0, column=0, padx=15, pady=15, sticky="w")
+
+        self.combo_engine_mode = ctk.CTkComboBox(
+            settings_box,
+            width=450,
+            values=[
+                "Pi Agent Bridge (Gemini 3.8 Flash Subscription)",
+                "Standard Gemini API Key"
+            ],
+            command=self._on_engine_mode_change
+        )
+        self.combo_engine_mode.grid(row=0, column=1, padx=10, pady=15, sticky="w")
+        current_mode = self.config_data.get("engine_mode", "pi_agent")
+        if current_mode == "pi_agent":
+            self.combo_engine_mode.set("Pi Agent Bridge (Gemini 3.8 Flash Subscription)")
+        else:
+            self.combo_engine_mode.set("Standard Gemini API Key")
+
+        # Gemini API Key (Optional if using Pi Agent Bridge)
+        lbl_gemini = ctk.CTkLabel(settings_box, text="Gemini API Key (Optional):", font=ctk.CTkFont(weight="bold"))
+        lbl_gemini.grid(row=1, column=0, padx=15, pady=15, sticky="w")
 
         self.entry_gemini_key = ctk.CTkEntry(settings_box, width=450, show="*")
         self.entry_gemini_key.insert(0, self.config_data.get("gemini_api_key", ""))
-        self.entry_gemini_key.grid(row=0, column=1, padx=10, pady=15, sticky="w")
+        self.entry_gemini_key.grid(row=1, column=1, padx=10, pady=15, sticky="w")
 
         lbl_yt_secret = ctk.CTkLabel(settings_box, text="YouTube Client Secret JSON:", font=ctk.CTkFont(weight="bold"))
-        lbl_yt_secret.grid(row=1, column=0, padx=15, pady=15, sticky="w")
+        lbl_yt_secret.grid(row=2, column=0, padx=15, pady=15, sticky="w")
 
         self.entry_secret_path = ctk.CTkEntry(settings_box, width=450)
         self.entry_secret_path.insert(0, self.config_data.get("youtube_client_secret_path", ""))
-        self.entry_secret_path.grid(row=1, column=1, padx=10, pady=15, sticky="w")
+        self.entry_secret_path.grid(row=2, column=1, padx=10, pady=15, sticky="w")
 
         btn_browse_secret = ctk.CTkButton(settings_box, text="Browse...", width=100, command=self._browse_secret_file)
-        btn_browse_secret.grid(row=1, column=2, padx=10, pady=15)
+        btn_browse_secret.grid(row=2, column=2, padx=10, pady=15)
 
         lbl_out = ctk.CTkLabel(settings_box, text="Export Directory:", font=ctk.CTkFont(weight="bold"))
-        lbl_out.grid(row=2, column=0, padx=15, pady=15, sticky="w")
+        lbl_out.grid(row=3, column=0, padx=15, pady=15, sticky="w")
 
         self.entry_output_dir = ctk.CTkEntry(settings_box, width=450)
         self.entry_output_dir.insert(0, self.config_data.get("output_dir", str(OUTPUT_DIR)))
-        self.entry_output_dir.grid(row=2, column=1, padx=10, pady=15, sticky="w")
+        self.entry_output_dir.grid(row=3, column=1, padx=10, pady=15, sticky="w")
 
         btn_browse_out = ctk.CTkButton(settings_box, text="Browse...", width=100, command=self._browse_output_dir)
-        btn_browse_out.grid(row=2, column=2, padx=10, pady=15)
+        btn_browse_out.grid(row=3, column=2, padx=10, pady=15)
 
         btn_save = ctk.CTkButton(
             self.tab_settings, 
@@ -303,7 +324,12 @@ class AutoCastApp(ctk.CTk):
             self.entry_output_dir.delete(0, "end")
             self.entry_output_dir.insert(0, d)
 
+    def _on_engine_mode_change(self, choice: str):
+        pass
+
     def _save_settings_action(self):
+        mode_val = "pi_agent" if "Pi Agent" in self.combo_engine_mode.get() else "api_key"
+        self.config_data["engine_mode"] = mode_val
         self.config_data["gemini_api_key"] = self.entry_gemini_key.get().strip()
         self.config_data["youtube_client_secret_path"] = self.entry_secret_path.get().strip()
         self.config_data["output_dir"] = self.entry_output_dir.get().strip()
@@ -318,21 +344,23 @@ class AutoCastApp(ctk.CTk):
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_generate_script(self):
+        mode = self.config_data.get("engine_mode", "pi_agent")
         api_key = self.config_data.get("gemini_api_key", "").strip()
-        if not api_key:
-            messagebox.showwarning("API Key Missing", "Please configure your Gemini API Key in the Settings tab.")
+
+        if mode == "api_key" and not api_key:
+            messagebox.showwarning("API Key Missing", "Please configure your Gemini API Key or switch to 'Pi Agent Bridge' mode in Settings.")
             self._switch_tab("settings")
             return
 
         theme = self.combo_theme.get()
         custom_prompt = self.entry_custom_prompt.get().strip()
 
-        self._update_status("Synthesizing script using Gemini engine...")
+        self._update_status("Synthesizing script using Gemini 3.8 Flash...")
         self.btn_gen_script.configure(state="disabled")
 
         def worker():
             try:
-                generator = StoryGenerator(api_key=api_key)
+                generator = StoryGenerator(engine_mode=mode, api_key=api_key)
                 story_data = generator.generate_story(theme, custom_prompt)
                 self.generated_story_data = story_data
 
@@ -344,7 +372,7 @@ class AutoCastApp(ctk.CTk):
                 self.txt_yt_desc.delete("1.0", "end")
                 self.txt_yt_desc.insert("1.0", f"{story_data['description']}\n\nTags: {story_data['tags']}")
 
-                self._update_status("Script generated successfully. Ready for video rendering.")
+                self._update_status("Script generated successfully via Gemini 3.8 Flash.")
             except Exception as e:
                 self._update_status(f"Error during script generation: {str(e)}")
                 messagebox.showerror("Script Generation Failed", str(e))

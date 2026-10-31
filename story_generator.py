@@ -1,6 +1,8 @@
 import os
+import subprocess
+import shutil
+from pathlib import Path
 from google import genai
-from google.genai import types
 
 STORY_PROMPT_TEMPLATE = """
 You are a professional children's storyteller and educational content developer.
@@ -39,11 +41,14 @@ Provide the output strictly using the following delimiters:
 """
 
 class StoryGenerator:
-    def __init__(self, api_key: str):
+    def __init__(self, engine_mode: str = "pi_agent", api_key: str = ""):
+        """
+        engine_mode:
+          - "pi_agent": Uses your authenticated Pi subscription (Gemini 3.8 Flash via WezTerm / WSL bridge).
+          - "api_key": Uses a standard Gemini API key via official google-genai SDK.
+        """
+        self.engine_mode = engine_mode
         self.api_key = api_key.strip()
-        if not self.api_key:
-            raise ValueError("Gemini API Key is required. Please set it in Settings.")
-        self.client = genai.Client(api_key=self.api_key)
 
     def generate_story(self, theme: str, custom_prompt: str = "") -> dict:
         prompt = STORY_PROMPT_TEMPLATE.format(
@@ -51,13 +56,62 @@ class StoryGenerator:
             custom_prompt=custom_prompt if custom_prompt else "Create a cheerful, moral-rich story suitable for toddlers and primary school children."
         )
 
-        response = self.client.models.generate_content(
+        if self.engine_mode == "pi_agent":
+            raw_text = self._generate_via_pi_agent(prompt)
+        else:
+            raw_text = self._generate_via_api_key(prompt)
+
+        return self._parse_story(raw_text)
+
+    def _generate_via_pi_agent(self, prompt: str) -> str:
+        """
+        Calls Pi with your signed-in Gemini 3.8 Flash subscription via terminal bridge.
+        Supports native Linux execution or Windows -> WSL bridge transparently.
+        """
+        # Save prompt to temporary file to avoid command-line escaping issues
+        temp_dir = Path(os.environ.get("TEMP", "/tmp"))
+        prompt_file = temp_dir / "autocast_story_prompt.txt"
+        with open(prompt_file, "w", encoding="utf-8") as f:
+            f.write(prompt)
+
+        # Determine command depending on runtime OS
+        if os.name == "nt":
+            # On Windows, bridge into WSL where Pi agent with Antigravity session is running
+            # Convert Windows temp path to WSL path
+            drive = prompt_file.drive.replace(":", "").lower()
+            wsl_prompt_path = f"/mnt/{drive}/{prompt_file.as_posix()[3:]}"
+            cmd = [
+                "wsl.exe", "bash", "-lic",
+                f"cat '{wsl_prompt_path}' | pi --provider antigravity --model gemini-3.8-flash -p"
+            ]
+        else:
+            cmd = [
+                "bash", "-lic",
+                f"cat '{prompt_file}' | pi --provider antigravity --model gemini-3.8-flash -p"
+            ]
+
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                check=True
+            )
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            err = e.stderr or e.stdout or str(e)
+            raise RuntimeError(f"Pi Agent Gemini 3.8 Flash bridge error: {err}")
+
+    def _generate_via_api_key(self, prompt: str) -> str:
+        if not self.api_key:
+            raise ValueError("Gemini API Key is empty. Please enter your API Key or select 'Pi Agent Bridge' mode.")
+        client = genai.Client(api_key=self.api_key)
+        response = client.models.generate_content(
             model="gemini-3.8-flash",
             contents=prompt,
         )
-
-        raw_text = response.text or ""
-        return self._parse_story(raw_text)
+        return response.text or ""
 
     def _parse_story(self, text: str) -> dict:
         result = {

@@ -13,6 +13,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 PROFILES_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_CONFIG = {
+    "engine_mode": "pi_agent",
     "gemini_api_key": "",
     "youtube_client_secret_path": str(BASE_DIR / "client_secret.json"),
     "headless_mode": False,
