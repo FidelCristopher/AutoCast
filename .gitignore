@@ -1,0 +1,20 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local user configurations & API credentials
+config.json
+client_secret*.json
+*.pickle
+
+# Persistent browser automation profile & cookies
+browser_profile/
+
+# Data cache and generated exports
+data/
+output/
+
+# OS specific files
+Thumbs.db
+.DS_Store
