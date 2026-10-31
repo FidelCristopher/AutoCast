@@ -33,13 +33,22 @@ AutoCast/
 |-- youtube_uploader.py   YouTube Data API v3 uploader and scheduler
 ```
 
+## Flexible AI Story Generation Providers
+
+AutoCast is designed to be fully accessible to the open-source community, whether you have official API credits, a CLI coding subscription, or run local models:
+
+1. **Pi Agent Bridge**: Connects to your authenticated terminal agent subscription (such as Gemini 3.8 Flash via Antigravity). Requires zero API tokens or credit card billing.
+2. **OpenAI-Compatible Custom Endpoint**: Connect to local models or subscription proxies like **Ollama** (`http://localhost:11434/v1`), **LiteLLM** (`http://localhost:8000/v1`), **LM Studio**, or **Jan.ai**.
+3. **Official Google Gemini API Key**: Use direct developer API keys from Google AI Studio.
+4. **Manual Mode**: Generates structured prompt templates to copy-paste into any web chat interface (ChatGPT, Claude, Gemini Web) with zero dependencies.
+
 ## Setup Instructions
 
 ### 1. Prerequisites
 
 - Python 3.10+
 - Google Chrome or Chromium browser
-- Valid Gemini API key from Google AI Studio
+- Either an AI generation provider (Pi Agent, local Ollama/LiteLLM, or Gemini API key)
 - Google Cloud OAuth 2.0 Desktop Application credentials (`client_secret.json`) with YouTube Data API v3 enabled
 
 ### 2. Dependency Installation

@@ -14,6 +14,10 @@ PROFILES_DIR.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_CONFIG = {
     "engine_mode": "pi_agent",
+    "cli_command": "pi --provider antigravity --model gemini-3.8-flash -p",
+    "openai_base_url": "http://localhost:11434/v1",
+    "openai_model": "llama3",
+    "openai_api_key": "",
     "gemini_api_key": "",
     "youtube_client_secret_path": str(BASE_DIR / "client_secret.json"),
     "headless_mode": False,

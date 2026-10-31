@@ -247,52 +247,91 @@ class AutoCastApp(ctk.CTk):
         settings_box.pack(fill="x", padx=5, pady=5)
 
         # AI Engine Mode Selector
-        lbl_mode = ctk.CTkLabel(settings_box, text="Gemini Engine Source:", font=ctk.CTkFont(weight="bold"))
-        lbl_mode.grid(row=0, column=0, padx=15, pady=15, sticky="w")
+        lbl_mode = ctk.CTkLabel(settings_box, text="Story Generation Engine:", font=ctk.CTkFont(weight="bold"))
+        lbl_mode.grid(row=0, column=0, padx=15, pady=12, sticky="w")
 
         self.combo_engine_mode = ctk.CTkComboBox(
             settings_box,
             width=450,
             values=[
                 "Pi Agent Bridge (Gemini 3.8 Flash Subscription)",
-                "Standard Gemini API Key"
+                "OpenAI-Compatible Custom Endpoint (Ollama / LiteLLM)",
+                "Official Google Gemini API Key",
+                "Manual Story Script Mode (Copy & Paste)"
             ],
             command=self._on_engine_mode_change
         )
-        self.combo_engine_mode.grid(row=0, column=1, padx=10, pady=15, sticky="w")
+        self.combo_engine_mode.grid(row=0, column=1, padx=10, pady=12, sticky="w")
         current_mode = self.config_data.get("engine_mode", "pi_agent")
         if current_mode == "pi_agent":
             self.combo_engine_mode.set("Pi Agent Bridge (Gemini 3.8 Flash Subscription)")
+        elif current_mode == "openai_compatible":
+            self.combo_engine_mode.set("OpenAI-Compatible Custom Endpoint (Ollama / LiteLLM)")
+        elif current_mode == "manual":
+            self.combo_engine_mode.set("Manual Story Script Mode (Copy & Paste)")
         else:
-            self.combo_engine_mode.set("Standard Gemini API Key")
+            self.combo_engine_mode.set("Official Google Gemini API Key")
 
-        # Gemini API Key (Optional if using Pi Agent Bridge)
-        lbl_gemini = ctk.CTkLabel(settings_box, text="Gemini API Key (Optional):", font=ctk.CTkFont(weight="bold"))
-        lbl_gemini.grid(row=1, column=0, padx=15, pady=15, sticky="w")
+        # Row 1: CLI Pipe Command (For Pi / Terminal Agent)
+        lbl_cli = ctk.CTkLabel(settings_box, text="CLI Agent Command:", font=ctk.CTkFont(weight="bold"))
+        lbl_cli.grid(row=1, column=0, padx=15, pady=10, sticky="w")
+
+        self.entry_cli_command = ctk.CTkEntry(settings_box, width=450)
+        self.entry_cli_command.insert(0, self.config_data.get("cli_command", "pi --provider antigravity --model gemini-3.8-flash -p"))
+        self.entry_cli_command.grid(row=1, column=1, padx=10, pady=10, sticky="w")
+
+        # Row 2: Custom Base URL (OpenAI / Ollama / Local proxy)
+        lbl_base_url = ctk.CTkLabel(settings_box, text="Custom Base URL:", font=ctk.CTkFont(weight="bold"))
+        lbl_base_url.grid(row=2, column=0, padx=15, pady=10, sticky="w")
+
+        self.entry_base_url = ctk.CTkEntry(settings_box, width=450, placeholder_text="e.g. http://localhost:11434/v1")
+        self.entry_base_url.insert(0, self.config_data.get("openai_base_url", "http://localhost:11434/v1"))
+        self.entry_base_url.grid(row=2, column=1, padx=10, pady=10, sticky="w")
+
+        # Row 3: Custom Model Name & Key
+        lbl_custom_model = ctk.CTkLabel(settings_box, text="Custom Model / Key:", font=ctk.CTkFont(weight="bold"))
+        lbl_custom_model.grid(row=3, column=0, padx=15, pady=10, sticky="w")
+
+        custom_model_frame = ctk.CTkFrame(settings_box, fg_color="transparent")
+        custom_model_frame.grid(row=3, column=1, padx=10, pady=10, sticky="w")
+
+        self.entry_custom_model = ctk.CTkEntry(custom_model_frame, width=220, placeholder_text="Model (e.g. llama3)")
+        self.entry_custom_model.insert(0, self.config_data.get("openai_model", "llama3"))
+        self.entry_custom_model.pack(side="left", padx=(0, 10))
+
+        self.entry_custom_key = ctk.CTkEntry(custom_model_frame, width=220, show="*", placeholder_text="API Key (Optional)")
+        self.entry_custom_key.insert(0, self.config_data.get("openai_api_key", ""))
+        self.entry_custom_key.pack(side="left")
+
+        # Row 4: Official Gemini API Key
+        lbl_gemini = ctk.CTkLabel(settings_box, text="Official Gemini API Key:", font=ctk.CTkFont(weight="bold"))
+        lbl_gemini.grid(row=4, column=0, padx=15, pady=10, sticky="w")
 
         self.entry_gemini_key = ctk.CTkEntry(settings_box, width=450, show="*")
         self.entry_gemini_key.insert(0, self.config_data.get("gemini_api_key", ""))
-        self.entry_gemini_key.grid(row=1, column=1, padx=10, pady=15, sticky="w")
+        self.entry_gemini_key.grid(row=4, column=1, padx=10, pady=10, sticky="w")
 
+        # Row 5: YouTube Client Secret
         lbl_yt_secret = ctk.CTkLabel(settings_box, text="YouTube Client Secret JSON:", font=ctk.CTkFont(weight="bold"))
-        lbl_yt_secret.grid(row=2, column=0, padx=15, pady=15, sticky="w")
+        lbl_yt_secret.grid(row=5, column=0, padx=15, pady=10, sticky="w")
 
         self.entry_secret_path = ctk.CTkEntry(settings_box, width=450)
         self.entry_secret_path.insert(0, self.config_data.get("youtube_client_secret_path", ""))
-        self.entry_secret_path.grid(row=2, column=1, padx=10, pady=15, sticky="w")
+        self.entry_secret_path.grid(row=5, column=1, padx=10, pady=10, sticky="w")
 
         btn_browse_secret = ctk.CTkButton(settings_box, text="Browse...", width=100, command=self._browse_secret_file)
-        btn_browse_secret.grid(row=2, column=2, padx=10, pady=15)
+        btn_browse_secret.grid(row=5, column=2, padx=10, pady=10)
 
+        # Row 6: Export Directory
         lbl_out = ctk.CTkLabel(settings_box, text="Export Directory:", font=ctk.CTkFont(weight="bold"))
-        lbl_out.grid(row=3, column=0, padx=15, pady=15, sticky="w")
+        lbl_out.grid(row=6, column=0, padx=15, pady=10, sticky="w")
 
         self.entry_output_dir = ctk.CTkEntry(settings_box, width=450)
         self.entry_output_dir.insert(0, self.config_data.get("output_dir", str(OUTPUT_DIR)))
-        self.entry_output_dir.grid(row=3, column=1, padx=10, pady=15, sticky="w")
+        self.entry_output_dir.grid(row=6, column=1, padx=10, pady=10, sticky="w")
 
         btn_browse_out = ctk.CTkButton(settings_box, text="Browse...", width=100, command=self._browse_output_dir)
-        btn_browse_out.grid(row=3, column=2, padx=10, pady=15)
+        btn_browse_out.grid(row=6, column=2, padx=10, pady=10)
 
         btn_save = ctk.CTkButton(
             self.tab_settings, 
@@ -328,8 +367,21 @@ class AutoCastApp(ctk.CTk):
         pass
 
     def _save_settings_action(self):
-        mode_val = "pi_agent" if "Pi Agent" in self.combo_engine_mode.get() else "api_key"
+        selected = self.combo_engine_mode.get()
+        if "Pi Agent" in selected:
+            mode_val = "pi_agent"
+        elif "OpenAI" in selected:
+            mode_val = "openai_compatible"
+        elif "Manual" in selected:
+            mode_val = "manual"
+        else:
+            mode_val = "gemini_api"
+
         self.config_data["engine_mode"] = mode_val
+        self.config_data["cli_command"] = self.entry_cli_command.get().strip()
+        self.config_data["openai_base_url"] = self.entry_base_url.get().strip()
+        self.config_data["openai_model"] = self.entry_custom_model.get().strip()
+        self.config_data["openai_api_key"] = self.entry_custom_key.get().strip()
         self.config_data["gemini_api_key"] = self.entry_gemini_key.get().strip()
         self.config_data["youtube_client_secret_path"] = self.entry_secret_path.get().strip()
         self.config_data["output_dir"] = self.entry_output_dir.get().strip()
@@ -345,34 +397,30 @@ class AutoCastApp(ctk.CTk):
 
     def _on_generate_script(self):
         mode = self.config_data.get("engine_mode", "pi_agent")
-        api_key = self.config_data.get("gemini_api_key", "").strip()
-
-        if mode == "api_key" and not api_key:
-            messagebox.showwarning("API Key Missing", "Please configure your Gemini API Key or switch to 'Pi Agent Bridge' mode in Settings.")
-            self._switch_tab("settings")
-            return
 
         theme = self.combo_theme.get()
         custom_prompt = self.entry_custom_prompt.get().strip()
 
-        self._update_status("Synthesizing script using Gemini 3.8 Flash...")
+        self._update_status(f"Generating story using [{mode}] provider...")
         self.btn_gen_script.configure(state="disabled")
 
         def worker():
             try:
-                generator = StoryGenerator(engine_mode=mode, api_key=api_key)
+                generator = StoryGenerator(config=self.config_data)
                 story_data = generator.generate_story(theme, custom_prompt)
                 self.generated_story_data = story_data
 
                 self.txt_script_preview.delete("1.0", "end")
-                self.txt_script_preview.insert("1.0", f"TITLE: {story_data['title']}\n\n{story_data['content']}")
-
-                self.entry_yt_title.delete(0, "end")
-                self.entry_yt_title.insert(0, story_data["title"])
-                self.txt_yt_desc.delete("1.0", "end")
-                self.txt_yt_desc.insert("1.0", f"{story_data['description']}\n\nTags: {story_data['tags']}")
-
-                self._update_status("Script generated successfully via Gemini 3.8 Flash.")
+                if mode == "manual":
+                    self.txt_script_preview.insert("1.0", story_data["content"])
+                    self._update_status("Manual prompt generated! Copy to your preferred AI chat, then paste the story here.")
+                else:
+                    self.txt_script_preview.insert("1.0", f"TITLE: {story_data['title']}\n\n{story_data['content']}")
+                    self.entry_yt_title.delete(0, "end")
+                    self.entry_yt_title.insert(0, story_data["title"])
+                    self.txt_yt_desc.delete("1.0", "end")
+                    self.txt_yt_desc.insert("1.0", f"{story_data['description']}\n\nTags: {story_data['tags']}")
+                    self._update_status(f"Script generated successfully via {mode}.")
             except Exception as e:
                 self._update_status(f"Error during script generation: {str(e)}")
                 messagebox.showerror("Script Generation Failed", str(e))

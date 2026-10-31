@@ -1,6 +1,7 @@
 import os
+import json
+import urllib.request
 import subprocess
-import shutil
 from pathlib import Path
 from google import genai
 
@@ -41,14 +42,9 @@ Provide the output strictly using the following delimiters:
 """
 
 class StoryGenerator:
-    def __init__(self, engine_mode: str = "pi_agent", api_key: str = ""):
-        """
-        engine_mode:
-          - "pi_agent": Uses your authenticated Pi subscription (Gemini 3.8 Flash via WezTerm / WSL bridge).
-          - "api_key": Uses a standard Gemini API key via official google-genai SDK.
-        """
-        self.engine_mode = engine_mode
-        self.api_key = api_key.strip()
+    def __init__(self, config: dict):
+        self.config = config
+        self.engine_mode = config.get("engine_mode", "pi_agent")
 
     def generate_story(self, theme: str, custom_prompt: str = "") -> dict:
         prompt = STORY_PROMPT_TEMPLATE.format(
@@ -57,37 +53,40 @@ class StoryGenerator:
         )
 
         if self.engine_mode == "pi_agent":
-            raw_text = self._generate_via_pi_agent(prompt)
+            raw_text = self._generate_via_cli_bridge(prompt)
+        elif self.engine_mode == "openai_compatible":
+            raw_text = self._generate_via_openai_endpoint(prompt)
+        elif self.engine_mode == "manual":
+            raw_text = prompt
+            return {
+                "title": f"Story Prompt: {theme}",
+                "description": "Copy this prompt and paste it into your preferred web AI chat.",
+                "tags": "cerita anak, dongeng fabel, edukasi",
+                "content": prompt
+            }
         else:
-            raw_text = self._generate_via_api_key(prompt)
+            raw_text = self._generate_via_gemini_api(prompt)
 
         return self._parse_story(raw_text)
 
-    def _generate_via_pi_agent(self, prompt: str) -> str:
-        """
-        Calls Pi with your signed-in Gemini 3.8 Flash subscription via terminal bridge.
-        Supports native Linux execution or Windows -> WSL bridge transparently.
-        """
-        # Save prompt to temporary file to avoid command-line escaping issues
+    def _generate_via_cli_bridge(self, prompt: str) -> str:
+        cli_cmd = self.config.get("cli_command", "pi --provider antigravity --model gemini-3.8-flash -p").strip()
         temp_dir = Path(os.environ.get("TEMP", "/tmp"))
         prompt_file = temp_dir / "autocast_story_prompt.txt"
         with open(prompt_file, "w", encoding="utf-8") as f:
             f.write(prompt)
 
-        # Determine command depending on runtime OS
         if os.name == "nt":
-            # On Windows, bridge into WSL where Pi agent with Antigravity session is running
-            # Convert Windows temp path to WSL path
             drive = prompt_file.drive.replace(":", "").lower()
             wsl_prompt_path = f"/mnt/{drive}/{prompt_file.as_posix()[3:]}"
             cmd = [
                 "wsl.exe", "bash", "-lic",
-                f"cat '{wsl_prompt_path}' | pi --provider antigravity --model gemini-3.8-flash -p"
+                f"cat '{wsl_prompt_path}' | {cli_cmd}"
             ]
         else:
             cmd = [
                 "bash", "-lic",
-                f"cat '{prompt_file}' | pi --provider antigravity --model gemini-3.8-flash -p"
+                f"cat '{prompt_file}' | {cli_cmd}"
             ]
 
         try:
@@ -101,12 +100,48 @@ class StoryGenerator:
             return result.stdout.strip()
         except subprocess.CalledProcessError as e:
             err = e.stderr or e.stdout or str(e)
-            raise RuntimeError(f"Pi Agent Gemini 3.8 Flash bridge error: {err}")
+            raise RuntimeError(f"CLI / Subscription Agent Bridge Error: {err}")
 
-    def _generate_via_api_key(self, prompt: str) -> str:
-        if not self.api_key:
-            raise ValueError("Gemini API Key is empty. Please enter your API Key or select 'Pi Agent Bridge' mode.")
-        client = genai.Client(api_key=self.api_key)
+    def _generate_via_openai_endpoint(self, prompt: str) -> str:
+        base_url = self.config.get("openai_base_url", "http://localhost:11434/v1").rstrip("/")
+        model = self.config.get("openai_model", "llama3").strip()
+        api_key = self.config.get("openai_api_key", "").strip() or "dummy-key"
+
+        url = f"{base_url}/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a professional children's storyteller."},
+                {"role": "user", "content": prompt}
+            ],
+            "temperature": 0.7
+        }
+
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                choices = data.get("choices", [])
+                if choices:
+                    return choices[0].get("message", {}).get("content", "")
+                raise RuntimeError("Empty response received from OpenAI-compatible endpoint.")
+        except Exception as e:
+            raise RuntimeError(f"OpenAI-Compatible endpoint error ({base_url}): {str(e)}")
+
+    def _generate_via_gemini_api(self, prompt: str) -> str:
+        api_key = self.config.get("gemini_api_key", "").strip()
+        if not api_key:
+            raise ValueError("Gemini API Key is empty. Please set it in Settings.")
+        client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
             model="gemini-3.8-flash",
             contents=prompt,
