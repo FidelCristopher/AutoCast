@@ -11,8 +11,10 @@ AutoCast is an automated desktop application designed for streamlined content ge
 The project is structured into modular components:
 
 - `main.py`: Desktop graphical user interface built with CustomTkinter.
-- `story_generator.py`: Script generation engine powered by Gemini 2.5 Flash, generating multi-act narrative scripts, titles, descriptions, and tags.
-- `studio_worker.py`: Headless browser automation layer via Playwright managing persistent session authentication, workspace synthesis, and video export.
+- `remotion_worker.py`: Programmatic dynamic video rendering engine via Remotion.
+- `remotion-studio/`: React & Remotion project workspace handling animated camera motion, bouncy subtitles, and vignette layers.
+- `story_generator.py`: Multi-provider narrative script engine (Pi Agent, OpenAI-compatible Ollama/LiteLLM, and Gemini API).
+- `studio_worker.py`: Headless browser automation layer via Playwright.
 - `youtube_uploader.py`: YouTube Data API v3 client managing chunked media upload, metadata tagging, COPPA compliance flags, and release scheduling.
 - `config.py`: Local runtime configuration, credential management, and output directory bindings.
 - `run.bat`: Windows execution script.

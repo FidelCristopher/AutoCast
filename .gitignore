@@ -18,3 +18,9 @@ output/
 # OS specific files
 Thumbs.db
 .DS_Store
+
+# Remotion dependencies and build outputs
+remotion-studio/node_modules/
+remotion-studio/out/
+remotion-studio/.remotion/
+remotion-studio/dist/

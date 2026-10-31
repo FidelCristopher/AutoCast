@@ -10,6 +10,7 @@ import customtkinter as ctk
 from config import load_config, save_config, BASE_DIR, PROFILES_DIR, OUTPUT_DIR, DATA_DIR
 from story_generator import StoryGenerator
 from studio_worker import StudioAutomationEngine
+from remotion_worker import RemotionVideoEngine
 from youtube_uploader import YouTubeScheduler
 
 ctk.set_appearance_mode("Dark")
@@ -149,9 +150,9 @@ class AutoCastApp(ctk.CTk):
 
         self.btn_gen_video = ctk.CTkButton(
             btn_frame, 
-            text="2. Synthesize & Export Video", 
-            fg_color="#0F9D58", 
-            hover_color="#0B8043",
+            text="2. Render Remotion Video (Dynamic Motion)", 
+            fg_color="#0284C7", 
+            hover_color="#0369A1",
             command=self._on_generate_video
         )
         self.btn_gen_video.pack(side="left", padx=10)
@@ -430,41 +431,68 @@ class AutoCastApp(ctk.CTk):
         threading.Thread(target=worker, daemon=True).start()
 
     def _on_generate_video(self):
-        if not self.generated_story_data:
-            content = self.txt_script_preview.get("1.0", "end").strip()
-            if not content:
-                messagebox.showwarning("Empty Content", "Please generate a script or input text in the preview box.")
-                return
-            self.generated_story_data = {
-                "title": "Children Story Episode",
-                "content": content,
-                "description": "",
-                "tags": ""
-            }
+        content = self.txt_script_preview.get("1.0", "end").strip()
+        if not content:
+            messagebox.showwarning("Empty Content", "Please generate a story script first.")
+            return
 
+        title = self.entry_yt_title.get().strip() or "Petualangan Dongeng Anak"
         out_dir = Path(self.config_data.get("output_dir", str(OUTPUT_DIR)))
-        self._update_status("Starting cloud synthesis pipeline...")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        sanitized_title = "".join(c for c in title if c.isalnum() or c in (" ", "_", "-")).rstrip()
+        target_mp4 = out_dir / f"{sanitized_title}_{int(datetime.datetime.now().timestamp())}.mp4"
+
+        # Split content into dynamic narrative scenes
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip() and not p.startswith("TITLE:")]
+        if not paragraphs:
+            paragraphs = [content[:120], content[120:240]]
+
+        # Dynamic sample illustrated backgrounds for scenes
+        sample_images = [
+            "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=1280&q=80",
+            "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1280&q=80",
+            "https://images.unsplash.com/photo-1511497584788-87676104235f?w=1280&q=80",
+            "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1280&q=80"
+        ]
+
+        scenes = []
+        for i, para in enumerate(paragraphs[:6]):
+            img = sample_images[i % len(sample_images)]
+            # Estimate duration based on word count (approx 150 words per min = ~2.5 words per sec @ 30fps)
+            word_count = len(para.split())
+            frames = max(90, min(300, int((word_count / 2.5) * 30)))
+            scenes.append({
+                "imageSrc": img,
+                "caption": para[:140] + ("..." if len(para) > 140 else ""),
+                "durationInFrames": frames
+            })
+
+        self._update_status("Starting Remotion Programmatic Video Engine...")
         self.btn_gen_video.configure(state="disabled")
 
         def worker():
             try:
-                engine = StudioAutomationEngine(profile_dir=PROFILES_DIR, headless=False)
-                video_file = engine.render_and_export_video(
-                    title=self.generated_story_data["title"],
-                    story_content=self.generated_story_data["content"],
-                    output_dir=out_dir,
+                engine = RemotionVideoEngine()
+                video_file = engine.render_story_video(
+                    composition_id="StoryVideo",
+                    title=title,
+                    scenes=scenes,
+                    output_mp4_path=str(target_mp4),
                     status_callback=self._update_status
                 )
                 self.downloaded_video_path = video_file
                 self.entry_video_file.delete(0, "end")
                 self.entry_video_file.insert(0, video_file)
 
-                self._update_status(f"Video ready: {os.path.basename(video_file)}")
-                messagebox.showinfo("Render Finished", f"Video exported to:\n{video_file}\n\nYou can now schedule it in the YouTube tab.")
+                self._update_status(f"Video rendered successfully: {os.path.basename(video_file)}")
+                messagebox.showinfo(
+                    "Remotion Render Finished",
+                    f"Dynamic motion video generated successfully!\n\nSaved to:\n{video_file}\n\nYou can now review and schedule it in the YouTube tab."
+                )
                 self._switch_tab("youtube")
             except Exception as e:
-                self._update_status(f"Pipeline error: {str(e)}")
-                messagebox.showerror("Video Generation Error", str(e))
+                self._update_status(f"Remotion render error: {str(e)}")
+                messagebox.showerror("Video Render Error", str(e))
             finally:
                 self.btn_gen_video.configure(state="normal")
 
